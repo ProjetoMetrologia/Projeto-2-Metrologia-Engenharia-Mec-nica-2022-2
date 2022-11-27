@@ -1,0 +1,150 @@
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128 //Comprimento da OLED 
+#define SCREEN_HEIGHT 32 //Altura da OLED
+#define SCREEN_ADDRESS 0x3C //Endereço I2C da OLED
+#define WIRE Wire
+
+Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &WIRE); 
+//Variaveis para o ultrasom 
+float distancia = 0;
+int portaEcho = 14, portaTrigger = 12; 
+int botao_in = 13; 
+
+
+//Variaveis para calculos
+
+int numero = 0, i=0; //Numero de medicoes realizadas
+int repetir = 0; 
+int tempo = 200; // Milisegundos do ultrasom
+
+float valores[100]; //Lista com os valores de cada medicao
+float soma = 0, soma_desvio = 0; 
+float media, desvio_padrao = 0, tendencia, precisao;
+float student = 2.025;
+float nominal = 150;     // Colocar valor nominal obtido pela trena
+
+const int qntd_medidas = 100;
+
+void setup() { Serial.begin(115200);
+
+  pinMode(portaEcho, INPUT);
+  pinMode(portaTrigger, OUTPUT);
+  pinMode(botao_in, INPUT);
+
+  //Setup da OLED
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C); //Iniciando OLED com resolucao e endereco
+
+  display.clearDisplay(); 
+  display.display();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+}
+
+void loop(){
+  if(digitalRead(botao_in) == HIGH){ //Quando o botao é pressionado, inicia as 100 medições 
+    repetir = 1;
+
+    Serial.println(nominal);
+    Serial.println("");
+  
+    //Display na OLED 
+    display.clearDisplay(); 
+    display.setCursor(0,16);
+    display.print("--------------");
+    display.display();
+    delay(1000);
+  
+     while (numero< qntd_medidas){ 
+      digitalWrite(portaTrigger, LOW);
+      delayMicroseconds(2);
+      digitalWrite(portaTrigger, HIGH);
+      delayMicroseconds(10); 
+      digitalWrite(portaTrigger, LOW); 
+  
+      // Calculo da distância pelo tempo do envio do pulso ultrassonico
+
+      distancia = pulseIn(portaEcho, HIGH) * 0.0337 / 2;
+
+      //Display na OLED 
+      display.clearDisplay(); 
+      display.setCursor(10,16);
+      display.print(distancia);
+      display.print(" cm");
+      display.display();
+
+      // Caso a distancia nao exceda o limite do sensor
+      // o mesmo e adicionado a lista de medicoes realizadas
+      if(distancia <= 400){
+        Serial.println(distancia); 
+        valores[numero] = distancia;
+        soma += distancia;
+        numero++;
+        }
+
+      //Display na OLED para separar as medicoes dos dados estatisticos
+      if(numero == qntd_medidas){
+         display.clearDisplay(); 
+        display.setCursor(0,16);
+        display.print("--------------");
+        display.display();
+        delay(1000);
+      }
+
+      delay(tempo);
+    }
+  }
+  if(repetir == 1){
+
+     media = soma/qntd_medidas;
+     Serial.print("Media = ");
+     Serial.println(media);
+  
+     for (i = 1;i <= qntd_medidas; i++){
+       soma_desvio = soma_desvio + pow((valores[i] - media),2);
+      }
+
+    desvio_padrao = sqrt(soma_desvio/qntd_medidas);
+    Serial.print("Desvio padrao = ");
+    Serial.println(desvio_padrao);
+
+    precisao = (student*desvio_padrao)/(sqrt(qntd_medidas));
+    Serial.print("Precisao = ");
+    Serial.println(precisao);
+
+    Serial.print("Nominal = ");
+    Serial.println(nominal);
+
+    tendencia = media - nominal;
+    Serial.print("Tendencia = ");
+    Serial.println(tendencia);
+    Serial.println("");
+  
+    // Valores para caso o usuario queira outra serie de medicoes
+    repetir = 0;
+    soma = 0;
+    numero = 0;
+    soma_desvio = 0;
+  }
+  
+  digitalWrite(portaTrigger, LOW);
+  delayMicroseconds(2); 
+  digitalWrite(portaTrigger, HIGH); 
+  delayMicroseconds(10); 
+  digitalWrite(portaTrigger, LOW); 
+
+  distancia = pulseIn(portaEcho, HIGH) * 0.0337 / 2; // Com o tempo dividido por 2, multiplica pela velocidade do som.
+
+  //Display na OLED 
+  display.clearDisplay(); 
+  display.setCursor(10,16);
+  display.print(distancia);
+  display.print(" cm");
+  display.display();
+  
+  delay(250);
+
+}
