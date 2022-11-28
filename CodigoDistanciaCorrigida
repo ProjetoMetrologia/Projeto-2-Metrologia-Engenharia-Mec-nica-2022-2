@@ -1,0 +1,73 @@
+
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128 //Comprimento da OLED 
+#define SCREEN_HEIGHT 32 //Altura da OLED
+#define SCREEN_ADDRESS 0x3C //Endereço I2C da OLED
+#define WIRE Wire
+
+Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &WIRE); //iniciando biblioteca 
+
+//Variaveis para o ultrasom 
+float distancia = 0;
+int portaEcho = 14, portaTrigger = 12; 
+
+
+//Variaveis para calculos
+float correcao = 0;
+float precisao = 0; 
+
+int tempo = 200; // Milisegundos do ultrasom
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(portaEcho, INPUT);
+  pinMode(portaTrigger, OUTPUT);
+
+  //Setup da OLED
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C); //Iniciando OLED com resolucao e endereco
+
+  display.clearDisplay(); 
+  display.display();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+  
+  //Display na OLED 
+  display.clearDisplay(); 
+  display.setCursor(0,16);
+  display.print("--- VG ---");
+  display.display();
+  delay(2000);
+ 
+}
+
+void loop(){
+  
+  //Ultrasonico
+  digitalWrite(portaTrigger, LOW);
+  delayMicroseconds(2); // Prepara para estado HIGH
+  digitalWrite(portaTrigger, HIGH); //Manda HIGH para a porta por 10uS
+  delayMicroseconds(10); //
+  digitalWrite(portaTrigger, LOW); //Joga para LOW de novo
+  
+  distancia = pulseIn(portaEcho, HIGH) * 0.0337 / 2; // Com o tempo dividido por 2, multiplica pela velocidade do som.
+
+  if (distancia <= 400){ 
+    //Calculo correcao e precisão
+    correcao = -7*pow(10,-6)*pow(distancia,4)+0.0011*pow(distancia,3)-0.0661*pow(distancia,2)+1.653*distancia-13.883;
+  
+    precisao = pow(10,-6)*pow(distancia,4.)-0,0002*pow(distancia,3.)+0.0111*pow(distancia,2.)-0.2569*distancia+2.1842 ;
+ 
+    //Display final na OLED 
+    display.clearDisplay(); 
+    display.setCursor(10,16);
+    display.print(distancia + correcao);
+    display.print(" ±");
+    display.print(precisao);
+    display.display();
+  }
+}
